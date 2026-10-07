@@ -8,12 +8,9 @@ async function runAction(userMessage) {
   }
 
   const message = String(userMessage).trim();
-  const plan = await planAction(message);
-  const plannedTool = plan.tool;
-  const plannedArgs = Array.isArray(plan.args) ? plan.args : [];
+  const plannedTool = await planAction(message);
 
   console.log(`🧠 Planner: ${plannedTool}`);
-  console.log(`🧩 Tool Args: ${JSON.stringify(plannedArgs)}`);
 
   if (plannedTool === 'ai') {
     return {
@@ -23,19 +20,6 @@ async function runAction(userMessage) {
   }
 
   let toolResult;
-
-  if (
-    plannedTool === 'files_list' ||
-    plannedTool === 'files_read' ||
-    plannedTool === 'files_write'
-  ) {
-    toolResult = await runTool(plannedTool, plannedArgs);
-
-    return {
-      tool: plannedTool,
-      answer: toolResult
-    };
-  }
 
   if (plannedTool === 'web_search') {
     const lowerMessage = message.toLowerCase();
@@ -63,7 +47,7 @@ async function runAction(userMessage) {
 
     toolResult = await runTool('web_search', [searchQuery]);
   } else {
-    toolResult = await runTool(plannedTool, plannedArgs);
+    toolResult = await runTool(plannedTool, []);
   }
 
   const finalPrompt = `

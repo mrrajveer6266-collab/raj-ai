@@ -4,6 +4,13 @@ const {
   getPermissionInfo
 } = require('../android/permission-manager');
 const { search: searchWeb } = require('../web/search-service');
+const {
+  BASE_DIR: FILES_BASE_DIR,
+  listFiles,
+  readText,
+  writeText
+} = require('./files');
+
 
 const TOOL_REGISTRY = {
   web_search: {
@@ -68,6 +75,52 @@ const TOOL_REGISTRY = {
     category: 'terminal',
     confirmation: false,
     run: () => runTerminal('whoami', [])
+  },
+
+  files_list: {
+    name: 'files_list',
+    description: 'RAJ AI की सुरक्षित files directory में files और folders दिखाना',
+    category: 'files',
+    confirmation: false,
+    run: async (relativePath = '.') => {
+      const items = await listFiles(relativePath);
+      if (!items.length) {
+        return 'Folder खाली है।';
+      }
+
+      return [
+        `Files location: ${FILES_BASE_DIR}`,
+        ...items.map(item => `${item.type === 'folder' ? '[Folder]' : '[File]'} ${item.name}`)
+      ].join('\\n');
+    }
+  },
+
+  files_read: {
+    name: 'files_read',
+    description: 'RAJ AI की सुरक्षित files directory से text file पढ़ना',
+    category: 'files',
+    confirmation: false,
+    run: async (relativePath = '') => {
+      if (!String(relativePath).trim()) {
+        throw new Error('File path जरूरी है।');
+      }
+
+      return readText(relativePath);
+    }
+  },
+
+  files_write: {
+    name: 'files_write',
+    description: 'RAJ AI की सुरक्षित files directory में text file बनाना या लिखना',
+    category: 'files',
+    confirmation: true,
+    run: async (relativePath = '', content = '') => {
+      if (!String(relativePath).trim()) {
+        throw new Error('File path जरूरी है।');
+      }
+
+      return writeText(relativePath, content);
+    }
   },
 
   android_permission_list: {
