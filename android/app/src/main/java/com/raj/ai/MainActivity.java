@@ -102,7 +102,7 @@ public class MainActivity extends Activity {
     }
 
     private String askBackend(String message) throws Exception {
-        URL url = new URL("https://YOUR-RAJ-AI-BACKEND/chat");
+        URL url = new URL("https://raj-ai-juvm.onrender.com/chat");
         HttpURLConnection connection =
                 (HttpURLConnection) url.openConnection();
 
