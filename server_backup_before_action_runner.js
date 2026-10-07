@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 const http = require('http');
-const { runAction } = require('./core/action-runner');
+const { askAI } = require('./core/ai');
 
 const PORT = Number(process.env.PORT) || 8787;
 
@@ -60,8 +60,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      const result = await runAction(message);
-      const answer = result.answer;
+      const answer = await askAI(message);
 
       sendJson(res, 200, {
         ok: true,
