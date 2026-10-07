@@ -3,7 +3,7 @@ require('dotenv').config();
 const http = require('http');
 const { askAI } = require('./core/ai');
 
-const PORT = 8787;
+const PORT = Number(process.env.PORT) || 8787;
 
 function sendJson(res, status, data) {
   res.writeHead(status, {
