@@ -17,6 +17,33 @@ Rules:
 `;
 
 async function planAction(userMessage) {
+  const message = String(userMessage || '').trim().toLowerCase();
+
+  const webTriggers = [
+    'latest',
+    'live',
+    'current',
+    'today',
+    'news',
+    'आज',
+    'अभी',
+    'ताजा',
+    'ताज़ा',
+    'करंट',
+    'न्यूज़',
+    'खबर',
+    'समाचार',
+    'वेब सर्च',
+    'web search',
+    'internet पर',
+    'internet par',
+    'online search'
+  ];
+
+  if (webTriggers.some(trigger => message.includes(trigger))) {
+    return 'web_search';
+  }
+
   const tools = listTools();
 
   const toolText = tools
@@ -29,7 +56,6 @@ async function planAction(userMessage) {
     `\n\nUser request:\n${userMessage}`;
 
   const result = await askAI(prompt);
-
   const choice = result.trim().toLowerCase();
 
   const allowed = new Set([

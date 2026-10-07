@@ -3,8 +3,41 @@ const {
   listRequiredPermissions,
   getPermissionInfo
 } = require('../android/permission-manager');
+const { search: searchWeb } = require('../web/search-service');
 
 const TOOL_REGISTRY = {
+  web_search: {
+    name: 'web_search',
+    description: 'Internet पर current information और news search करना',
+    category: 'web',
+    confirmation: false,
+    run: async (query = '') => {
+      const cleanQuery = String(query || '').trim();
+
+      console.log(`🌐 Tool Web Search Query: ${cleanQuery}`);
+
+      const result = await searchWeb(cleanQuery, { limit: 8 });
+
+      if (!result.results.length) {
+        return 'कोई search result नहीं मिला।';
+      }
+
+      return result.results
+        .map((item, index) => {
+          const title = item.title || 'Untitled';
+          const url = item.url || '';
+          const publishedAt = item.publishedAt || 'Published date unavailable';
+
+          return [
+            `${index + 1}. ${title}`,
+            `Source URL: ${url}`,
+            `Published: ${publishedAt}`
+          ].join('\n');
+        })
+        .join('\n\n');
+    }
+  },
+
   terminal_pwd: {
     name: 'terminal_pwd',
     description: 'Current home/working directory बताना',
@@ -68,14 +101,14 @@ function listTools() {
   }));
 }
 
-async function runTool(name) {
+async function runTool(name, args = []) {
   const tool = getTool(name);
 
   if (!tool) {
     throw new Error(`Tool "${name}" उपलब्ध नहीं है।`);
   }
 
-  return tool.run();
+  return tool.run(...args);
 }
 
 module.exports = {
