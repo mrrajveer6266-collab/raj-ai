@@ -3,3 +3,6 @@ node_modules/
 android/manual-build/
 *.apk
 *.keystore
+android/.gradle/
+android/build/
+android/local.properties
