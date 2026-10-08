@@ -90,6 +90,29 @@ async function planAction(userMessage) {
     };
   }
 
+  const rememberMatch =
+    message.match(/^(?:याद रखो|याद रखना|remember)\s+(.+)$/i);
+
+  if (rememberMatch) {
+    return {
+      tool: 'memory_save',
+      args: [rememberMatch[1], 'user']
+    };
+  }
+
+  if (
+    message.includes('मेरी memory') ||
+    message.includes('memory दिखाओ') ||
+    message.includes('memory दिखा') ||
+    message.includes('saved memory') ||
+    message.includes('show memory')
+  ) {
+    return {
+      tool: 'memory_list',
+      args: [20]
+    };
+  }
+
   const tools = listTools();
 
   const toolText = tools

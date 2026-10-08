@@ -5,6 +5,11 @@ const {
 } = require('../android/permission-manager');
 const { search: searchWeb } = require('../web/search-service');
 const {
+  remember,
+  getMemories
+} = require('../core/memory');
+
+const {
   BASE_DIR: FILES_BASE_DIR,
   listFiles,
   readText,
@@ -75,6 +80,37 @@ const TOOL_REGISTRY = {
     category: 'terminal',
     confirmation: false,
     run: () => runTerminal('whoami', [])
+  },
+
+  memory_save: {
+    name: 'memory_save',
+    description: 'RAJ AI की सुरक्षित local memory में जानकारी save करना',
+    category: 'memory',
+    confirmation: false,
+    run: async (text = '', type = 'note') => {
+      return remember(text, type);
+    }
+  },
+
+  memory_list: {
+    name: 'memory_list',
+    description: 'RAJ AI की saved memory पढ़ना',
+    category: 'memory',
+    confirmation: false,
+    run: async (limit = 20) => {
+      const items = await getMemories(limit);
+
+      if (!items.length) {
+        return 'Memory खाली है।';
+      }
+
+      return items
+        .map(
+          (item, index) =>
+            `${index + 1}. [${item.type}] ${item.text}`
+        )
+        .join('\n');
+    }
   },
 
   files_list: {

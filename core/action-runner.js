@@ -27,7 +27,9 @@ async function runAction(userMessage) {
   if (
     plannedTool === 'files_list' ||
     plannedTool === 'files_read' ||
-    plannedTool === 'files_write'
+    plannedTool === 'files_write' ||
+    plannedTool === 'memory_save' ||
+    plannedTool === 'memory_list'
   ) {
     toolResult = await runTool(plannedTool, plannedArgs);
 
