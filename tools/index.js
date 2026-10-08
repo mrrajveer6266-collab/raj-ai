@@ -14,7 +14,8 @@ const {
   BASE_DIR: FILES_BASE_DIR,
   listFiles,
   readText,
-  writeText
+  writeText,
+  analyzeFile
 } = require('./files');
 
 
@@ -183,6 +184,28 @@ const TOOL_REGISTRY = {
       }
 
       return readText(relativePath);
+
+
+    }
+  },
+
+  files_analyze: {
+    name: 'files_analyze',
+    description: 'PDF, DOCX, TXT और supported files का content पढ़कर analysis के लिए तैयार करना',
+    category: 'files',
+    confirmation: false,
+    run: async (relativePath = '') => {
+      if (!String(relativePath).trim()) {
+        throw new Error('File path जरूरी है।');
+      }
+
+      const result = await analyzeFile(relativePath);
+
+      if (!result.text.trim()) {
+        return 'File पढ़ी गई, लेकिन उसमें readable text नहीं मिला।';
+      }
+
+      return result;
     }
   },
 

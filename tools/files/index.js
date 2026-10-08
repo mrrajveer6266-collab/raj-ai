@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
 
+const { analyzeFile } = require('./analyzer');
+
 const BASE_DIR = path.resolve(process.env.RAJ_AI_FILES_DIR || path.join(process.env.HOME || '.', 'raj-ai-files'));
 
 function safePath(relativePath = '.') {
@@ -44,5 +46,6 @@ module.exports = {
   BASE_DIR,
   listFiles,
   readText,
-  writeText
+  writeText,
+  analyzeFile
 };
