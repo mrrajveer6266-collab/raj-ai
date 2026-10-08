@@ -1,3 +1,4 @@
+const { generateImage, generateVideo, getVideoOperation } = require('../media/gemini-media');
 const { runTerminal } = require('./terminal');
 const {
   listRequiredPermissions,
@@ -18,6 +19,46 @@ const {
 
 
 const TOOL_REGISTRY = {
+  image_generate: {
+    name: 'image_generate',
+    description: 'Gemini से वास्तविक AI image generate करना',
+    category: 'media',
+    confirmation: false,
+    run: async (prompt = '') => {
+      if (!String(prompt).trim()) {
+        throw new Error('Image prompt जरूरी है।');
+      }
+      return generateImage(prompt);
+    }
+  },
+
+  video_generate: {
+    name: 'video_generate',
+    description: 'Veo से वास्तविक AI video generation शुरू करना',
+    category: 'media',
+    confirmation: false,
+    run: async (prompt = '') => {
+      if (!String(prompt).trim()) {
+        throw new Error('Video prompt जरूरी है।');
+      }
+      return generateVideo(prompt);
+    }
+  },
+
+  video_status: {
+    name: 'video_status',
+    description: 'चल रहे AI video generation का status देखना',
+    category: 'media',
+    confirmation: false,
+    run: async (operation = '') => {
+      if (!String(operation).trim()) {
+        throw new Error('Video operation जरूरी है।');
+      }
+      return getVideoOperation(operation);
+    }
+  },
+
+
   web_search: {
     name: 'web_search',
     description: 'Internet पर current information और news search करना',

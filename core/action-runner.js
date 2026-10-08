@@ -29,7 +29,10 @@ async function runAction(userMessage) {
     plannedTool === 'files_read' ||
     plannedTool === 'files_write' ||
     plannedTool === 'memory_save' ||
-    plannedTool === 'memory_list'
+    plannedTool === 'memory_list' ||
+    plannedTool === 'image_generate' ||
+    plannedTool === 'video_generate' ||
+    plannedTool === 'video_status'
   ) {
     toolResult = await runTool(plannedTool, plannedArgs);
 

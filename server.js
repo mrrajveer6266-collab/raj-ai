@@ -61,11 +61,16 @@ const server = http.createServer(async (req, res) => {
       }
 
       const result = await runAction(message);
-      const answer = result.answer;
 
       sendJson(res, 200, {
         ok: true,
-        answer
+        tool: result.tool || 'ai',
+        answer: typeof result.answer === 'string'
+          ? result.answer
+          : '',
+        data: typeof result.answer === 'object' && result.answer !== null
+          ? result.answer
+          : null
       });
     } catch (error) {
       console.error('Chat error:', error.message);

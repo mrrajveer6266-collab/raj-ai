@@ -282,7 +282,8 @@ public class MainActivity extends Activity {
                 {"⌕", "Research"},
                 {"◈", "Analyze"},
                 {"▣", "Image"},
-                {"▤", "Files"}
+                {"▤", "Files"},
+                {"◉", "Camera"}
         };
 
         for (int i = 0; i < features.length; i++) {
@@ -315,6 +316,8 @@ public class MainActivity extends Activity {
             card.setOnClickListener(v -> {
                 if (featureName.equals("Image")) {
                     input.setText("Create an image");
+                } else if (featureName.equals("Camera")) {
+                    openCameraAction();
                 } else if (featureName.equals("Files")) {
                     input.setText("Analyze a file");
                 } else if (featureName.equals("Research")) {
@@ -652,13 +655,7 @@ public class MainActivity extends Activity {
             }
         });
 
-        plusButton.setOnClickListener(v -> {
-            Toast.makeText(
-                    this,
-                    "Tools: Image • Video • Files • Web • Live",
-                    Toast.LENGTH_SHORT
-            ).show();
-        });
+        plusButton.setOnClickListener(v -> showToolsMenu());
 
         input.setOnEditorActionListener(
                 (v, actionId, event) -> {
@@ -704,6 +701,89 @@ public class MainActivity extends Activity {
                     60
             );
         });
+    }
+
+private void showToolsMenu() {
+        final PopupWindow[] holder = new PopupWindow[1];
+
+        LinearLayout panel = new LinearLayout(this);
+        panel.setOrientation(LinearLayout.VERTICAL);
+        panel.setPadding(18, 18, 18, 18);
+        panel.setBackgroundColor(Color.rgb(20, 27, 45));
+
+        String[][] tools = {
+                {"▣", "Image"},
+                {"▶", "Video"},
+                {"▤", "Files"},
+                {"⌕", "Web"},
+                {"◉", "Camera"}
+        };
+
+        for (String[] tool : tools) {
+            TextView item = new TextView(this);
+            item.setText(tool[0] + "  " + tool[1]);
+            item.setTextSize(16);
+            item.setTextColor(Color.WHITE);
+            item.setGravity(Gravity.CENTER_VERTICAL);
+            item.setPadding(22, 20, 22, 20);
+
+            LinearLayout.LayoutParams lp =
+                    new LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT
+                    );
+            lp.setMargins(0, 4, 0, 4);
+            panel.addView(item, lp);
+
+            item.setOnClickListener(v -> {
+                String name = tool[1];
+
+                if (name.equals("Image")) {
+                    input.setText("Create an image");
+                    input.requestFocus();
+                } else if (name.equals("Video")) {
+                    input.setText("Create a video");
+                    input.requestFocus();
+                } else if (name.equals("Files")) {
+                    input.setText("Analyze a file");
+                    input.requestFocus();
+                } else if (name.equals("Web")) {
+                    input.setText("Search the web ");
+                    input.requestFocus();
+                } else if (name.equals("Camera")) {
+                    openCameraAction();
+                }
+
+                input.setSelection(input.length());
+
+                if (holder[0] != null) {
+                    holder[0].dismiss();
+                }
+            });
+        }
+
+        PopupWindow popup = new PopupWindow(
+                panel,
+                (int) (260 * getResources().getDisplayMetrics().density),
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                true
+        );
+
+        holder[0] = popup;
+
+        popup.setBackgroundDrawable(
+                new android.graphics.drawable.ColorDrawable(
+                        Color.rgb(20, 27, 45)
+                )
+        );
+        popup.setOutsideTouchable(true);
+        popup.setElevation(12f);
+
+        popup.showAsDropDown(
+                input,
+                0,
+                -330
+        );
     }
 
     private void toggleListening() {
@@ -1231,6 +1311,12 @@ public class MainActivity extends Activity {
         scrollMessagesToBottom();
     }
 
+    private void openCameraAction() {
+        if (androidBridge != null) {
+            androidBridge.openCamera(1002);
+        }
+    }
+
     @Override
     public void onRequestPermissionsResult(
             int requestCode,
@@ -1252,6 +1338,12 @@ public class MainActivity extends Activity {
                 if (micButton != null) {
                     micButton.setAlpha(0.7f);
                 }
+            }
+        }
+
+        if (requestCode == 1002 && androidBridge != null) {
+            if (androidBridge.hasCameraPermission()) {
+                openCameraAction();
             }
         }
     }

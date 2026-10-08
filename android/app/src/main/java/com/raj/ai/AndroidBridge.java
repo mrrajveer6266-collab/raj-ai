@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
+import android.content.Intent;
 
 public class AndroidBridge {
 
@@ -25,6 +26,18 @@ public class AndroidBridge {
 
     public boolean hasCameraPermission() {
         return hasPermission(Manifest.permission.CAMERA);
+    }
+
+    public void openCamera(int requestCode) {
+        if (!hasCameraPermission()) {
+            requestCameraPermission(requestCode);
+            return;
+        }
+
+        Intent intent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
+        if (intent.resolveActivity(activity.getPackageManager()) != null) {
+            activity.startActivity(intent);
+        }
     }
 
     public boolean hasNotificationPermission() {

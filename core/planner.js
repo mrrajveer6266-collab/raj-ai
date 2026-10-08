@@ -26,6 +26,41 @@ Rules:
 async function planAction(userMessage) {
   const message = String(userMessage || '').trim().toLowerCase();
 
+  const imageTriggers = [
+    'image बनाओ',
+    'image बनाना',
+    'image generate',
+    'generate image',
+    'create image',
+    'तस्वीर बनाओ',
+    'फोटो बनाओ',
+    'चित्र बनाओ'
+  ];
+
+  if (imageTriggers.some(trigger => message.includes(trigger))) {
+    return {
+      tool: 'image_generate',
+      args: [userMessage]
+    };
+  }
+
+  const videoTriggers = [
+    'video बनाओ',
+    'video बनाना',
+    'video generate',
+    'generate video',
+    'create video',
+    'वीडियो बनाओ',
+    'वीडियो बनाना'
+  ];
+
+  if (videoTriggers.some(trigger => message.includes(trigger))) {
+    return {
+      tool: 'video_generate',
+      args: [userMessage]
+    };
+  }
+
   const webTriggers = [
     'latest',
     'live',
