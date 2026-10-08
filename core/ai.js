@@ -82,7 +82,7 @@ async function callGroq(message) {
 }
 
 async function callGemini(message) {
-  const model = 'gemini-2.5-flash';
+  const model = 'gemini-3.8-flash';
 
   const r = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
@@ -154,7 +154,7 @@ async function callOpenRouter(message) {
 
 
 async function callGeminiImage(imageBase64, mimeType, message) {
-  const model = 'gemini-2.5-flash';
+  const model = 'gemini-3.8-flash';
 
   const r = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
