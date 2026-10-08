@@ -153,6 +153,74 @@ async function callOpenRouter(message) {
 }
 
 
+async function callGeminiImage(imageBase64, mimeType, message) {
+  const model = 'gemini-2.5-flash';
+
+  const r = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-goog-api-key': process.env.GEMINI_API_KEY
+      },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: SYSTEM_PROMPT }]
+        },
+        contents: [{
+          role: 'user',
+          parts: [
+            {
+              inlineData: {
+                mimeType: mimeType,
+                data: imageBase64
+              }
+            },
+            {
+              text: message
+            }
+          ]
+        }],
+        generationConfig: {
+          temperature: 0.7
+        }
+      })
+    }
+  );
+
+  const data = await r.json();
+
+  if (!r.ok) {
+    throw new Error(
+      data?.error?.message || `Gemini image ${r.status}`
+    );
+  }
+
+  return data.candidates?.[0]?.content?.parts
+    ?.map(p => p.text || '')
+    .join('')
+    .trim();
+}
+
+async function askAIWithImage(imageBase64, mimeType, userMessage) {
+  if (!process.env.GEMINI_API_KEY) {
+    throw new Error('GEMINI_API_KEY उपलब्ध नहीं है।');
+  }
+
+  const answer = await callGeminiImage(
+    imageBase64,
+    mimeType,
+    userMessage
+  );
+
+  if (!answer) {
+    throw new Error('Image का कोई जवाब नहीं मिला।');
+  }
+
+  return cleanAIResponse(answer);
+}
+
 async function askAI(message) {
   const providers = [
     ['Groq', callGroq],
@@ -190,5 +258,7 @@ module.exports = {
   askAI: async function(userMessage) {
     const response = await askAI(userMessage);
     return cleanAIResponse(response);
-  }
+  },
+
+  askAIWithImage
 };

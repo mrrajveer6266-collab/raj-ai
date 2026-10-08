@@ -6,6 +6,7 @@ import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.util.Base64;
 import android.os.Bundle;
 import android.speech.RecognitionListener;
 import android.speech.RecognizerIntent;
@@ -46,6 +47,9 @@ public class MainActivity extends Activity {
     TextView voiceTranscript;
     boolean listening = false;
     AndroidBridge androidBridge;
+
+    private android.net.Uri pendingImageUri;
+    private String pendingImageMimeType;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -319,7 +323,7 @@ public class MainActivity extends Activity {
                 } else if (featureName.equals("Camera")) {
                     openCameraAction();
                 } else if (featureName.equals("Files")) {
-                    input.setText("Analyze a file");
+                    openFilePickerAction();
                 } else if (featureName.equals("Research")) {
                     input.setText("Research ");
                     input.requestFocus();
@@ -745,8 +749,7 @@ private void showToolsMenu() {
                     input.setText("Create a video");
                     input.requestFocus();
                 } else if (name.equals("Files")) {
-                    input.setText("Analyze a file");
-                    input.requestFocus();
+                    openFilePickerAction();
                 } else if (name.equals("Web")) {
                     input.setText("Search the web ");
                     input.requestFocus();
@@ -846,6 +849,30 @@ private void showToolsMenu() {
         return text;
     }
 
+
+    private void attachImage(android.net.Uri uri) {
+        if (uri == null) {
+            addMessage("RAJ AI: Photo नहीं मिली।");
+            return;
+        }
+
+        pendingImageUri = uri;
+
+        String mime = getContentResolver().getType(uri);
+        if (mime == null || !mime.startsWith("image/")) {
+            mime = "image/jpeg";
+        }
+        pendingImageMimeType = mime;
+
+        addMessage("You: 📷 Photo attached");
+
+        input.requestFocus();
+
+        runOnUiThread(
+                () -> scrollMessagesToBottom()
+        );
+    }
+
     private void sendMessage(String text) {
         if (text == null || text.trim().isEmpty()) {
             return;
@@ -858,10 +885,27 @@ private void showToolsMenu() {
         input.setEnabled(false);
 
         final String finalText = text;
+        final android.net.Uri imageUri = pendingImageUri;
+        final String imageMimeType = pendingImageMimeType;
 
         new Thread(() -> {
             try {
-                String answer = askBackend(finalText);
+                String answer;
+
+                if (imageUri != null) {
+                    String base64 = readImageBase64(imageUri);
+
+                    answer = askImageBackend(
+                            base64,
+                            imageMimeType,
+                            finalText
+                    );
+
+                    pendingImageUri = null;
+                    pendingImageMimeType = null;
+                } else {
+                    answer = askBackend(finalText);
+                }
 
                 runOnUiThread(() -> {
                     addMessage("RAJ AI: " + answer);
@@ -870,7 +914,6 @@ private void showToolsMenu() {
                 });
 
             } catch (Exception e) {
-
                 runOnUiThread(() -> {
                     addMessage(
                             "RAJ AI: Connection error — "
@@ -880,6 +923,159 @@ private void showToolsMenu() {
                 });
             }
         }).start();
+    }
+
+    private String readImageBase64(
+            android.net.Uri uri
+    ) throws Exception {
+
+        final long MAX_IMAGE_SIZE = 6L * 1024L * 1024L;
+
+        java.io.ByteArrayOutputStream output =
+                new java.io.ByteArrayOutputStream();
+
+        try (InputStream inputStream =
+                     getContentResolver().openInputStream(uri)) {
+
+            if (inputStream == null) {
+                throw new Exception("Photo पढ़ी नहीं जा सकी।");
+            }
+
+            byte[] buffer = new byte[8192];
+            int read;
+            long total = 0;
+
+            while ((read = inputStream.read(buffer)) != -1) {
+                total += read;
+
+                if (total > MAX_IMAGE_SIZE) {
+                    throw new Exception(
+                            "Photo 6 MB से बड़ी है।"
+                    );
+                }
+
+                output.write(buffer, 0, read);
+            }
+        }
+
+        byte[] bytes = output.toByteArray();
+
+        if (bytes.length == 0) {
+            throw new Exception("Photo खाली है।");
+        }
+
+        return Base64.encodeToString(
+                bytes,
+                Base64.NO_WRAP
+        );
+    }
+
+    private String askImageBackend(
+            String base64,
+            String mimeType,
+            String question
+    ) throws Exception {
+
+        URL url = new URL(
+                "https://raj-ai-juvm.onrender.com/analyze-image"
+        );
+
+        HttpURLConnection connection =
+                (HttpURLConnection) url.openConnection();
+
+        connection.setRequestMethod("POST");
+        connection.setConnectTimeout(15000);
+        connection.setReadTimeout(60000);
+        connection.setDoOutput(true);
+
+        connection.setRequestProperty(
+                "Content-Type",
+                "application/json; charset=UTF-8"
+        );
+
+        JSONObject request = new JSONObject();
+        request.put("data", base64);
+        request.put(
+                "mimeType",
+                mimeType == null
+                        ? "image/jpeg"
+                        : mimeType
+        );
+        request.put("question", question);
+
+        try (OutputStream os =
+                     connection.getOutputStream()) {
+
+            os.write(
+                    request.toString()
+                            .getBytes("UTF-8")
+            );
+        }
+
+        int status = connection.getResponseCode();
+
+        InputStream stream =
+                status >= 200 && status < 300
+                        ? connection.getInputStream()
+                        : connection.getErrorStream();
+
+        if (stream == null) {
+            throw new Exception(
+                    "Server ने कोई response नहीं दिया।"
+            );
+        }
+
+        BufferedReader reader =
+                new BufferedReader(
+                        new InputStreamReader(
+                                stream,
+                                "UTF-8"
+                        )
+                );
+
+        StringBuilder response =
+                new StringBuilder();
+
+        String line;
+
+        while ((line = reader.readLine()) != null) {
+            response.append(line);
+        }
+
+        reader.close();
+        connection.disconnect();
+
+        JSONObject result =
+                new JSONObject(response.toString());
+
+        if (status < 200 || status >= 300) {
+            throw new Exception(
+                    result.optString(
+                            "error",
+                            "Image analysis failed"
+                    )
+            );
+        }
+
+        if (!result.optBoolean("ok", false)) {
+            throw new Exception(
+                    result.optString(
+                            "error",
+                            "Image analysis failed"
+                    )
+            );
+        }
+
+        String answer =
+                result.optString("answer", "").trim();
+
+        if (answer.isEmpty()) {
+            throw new Exception(
+                    "RAJ AI ने कोई answer नहीं दिया।"
+            );
+        }
+
+        return answer;
     }
 
     private void scrollMessagesToBottom() {
@@ -1309,6 +1505,267 @@ private void showToolsMenu() {
         messages.addView(row);
 
         scrollMessagesToBottom();
+    }
+
+    @Override
+    protected void onActivityResult(
+            int requestCode,
+            int resultCode,
+            Intent data
+    ) {
+        super.onActivityResult(requestCode, resultCode, data);
+
+        if (requestCode == 1002
+                && resultCode == RESULT_OK
+                && androidBridge != null) {
+
+            android.net.Uri uri = androidBridge.getCameraOutputUri();
+
+            if (uri != null) {
+                attachImage(uri);
+            } else {
+                addMessage("RAJ AI: Camera photo नहीं मिली।");
+            }
+
+            androidBridge.clearCameraOutputUri();
+            return;
+        }
+
+        if (requestCode == 1003
+                && resultCode == RESULT_OK
+                && data != null
+                && data.getData() != null) {
+
+            android.net.Uri uri = data.getData();
+            String mimeType = getContentResolver().getType(uri);
+
+            if (mimeType != null && mimeType.startsWith("image/")) {
+                attachImage(uri);
+            } else {
+                analyzeSelectedFile(uri);
+            }
+        }
+    }
+
+    private void analyzeSelectedFile(android.net.Uri uri) {
+        if (uri == null) {
+            addMessage("RAJ AI: File नहीं मिला।");
+            return;
+        }
+
+        input.setEnabled(false);
+        addMessage("You: 📁 File analysis");
+
+        new Thread(() -> {
+            try {
+                String fileName = "Selected file";
+
+                android.database.Cursor cursor =
+                        getContentResolver().query(
+                                uri,
+                                new String[]{
+                                        android.provider.OpenableColumns.DISPLAY_NAME
+                                },
+                                null,
+                                null,
+                                null
+                        );
+
+                if (cursor != null) {
+                    try {
+                        int nameIndex =
+                                cursor.getColumnIndex(
+                                        android.provider.OpenableColumns.DISPLAY_NAME
+                                );
+
+                        if (cursor.moveToFirst()
+                                && nameIndex >= 0
+                                && !cursor.isNull(nameIndex)) {
+                            fileName = cursor.getString(nameIndex);
+                        }
+                    } finally {
+                        cursor.close();
+                    }
+                }
+
+                String mimeType =
+                        getContentResolver().getType(uri);
+
+                if (mimeType == null) {
+                    mimeType = "application/octet-stream";
+                }
+
+                InputStream inputStream =
+                        getContentResolver().openInputStream(uri);
+
+                if (inputStream == null) {
+                    throw new Exception("File पढ़ी नहीं जा सकी।");
+                }
+
+                ByteArrayOutputStream buffer =
+                        new ByteArrayOutputStream();
+
+                byte[] temp = new byte[8192];
+                int read;
+                long total = 0;
+
+                final long MAX_FILE_SIZE =
+                        6L * 1024L * 1024L;
+
+                try {
+                    while ((read = inputStream.read(temp)) != -1) {
+                        total += read;
+
+                        if (total > MAX_FILE_SIZE) {
+                            throw new Exception(
+                                    "File 6 MB से बड़ी है।"
+                            );
+                        }
+
+                        buffer.write(temp, 0, read);
+                    }
+                } finally {
+                    inputStream.close();
+                }
+
+                String base64 =
+                        Base64.encodeToString(
+                                buffer.toByteArray(),
+                                Base64.NO_WRAP
+                        );
+
+                JSONObject request =
+                        new JSONObject();
+
+                request.put("fileName", fileName);
+                request.put("mimeType", mimeType);
+                request.put("data", base64);
+                request.put(
+                        "question",
+                        "इस file को पढ़कर मुख्य जानकारी, महत्वपूर्ण बातें और user के लिए उपयोगी निष्कर्ष बताओ।"
+                );
+
+                URL url =
+                        new URL(
+                                "https://raj-ai-juvm.onrender.com/analyze-file"
+                        );
+
+                HttpURLConnection connection =
+                        (HttpURLConnection)
+                                url.openConnection();
+
+                connection.setRequestMethod("POST");
+                connection.setConnectTimeout(15000);
+                connection.setReadTimeout(60000);
+                connection.setDoOutput(true);
+
+                connection.setRequestProperty(
+                        "Content-Type",
+                        "application/json; charset=UTF-8"
+                );
+
+                try (OutputStream os =
+                             connection.getOutputStream()) {
+                    os.write(
+                            request.toString()
+                                    .getBytes("UTF-8")
+                    );
+                }
+
+                int status =
+                        connection.getResponseCode();
+
+                InputStream responseStream =
+                        status >= 200 && status < 300
+                                ? connection.getInputStream()
+                                : connection.getErrorStream();
+
+                if (responseStream == null) {
+                    throw new Exception(
+                            "Server से response नहीं मिला।"
+                    );
+                }
+
+                BufferedReader reader =
+                        new BufferedReader(
+                                new InputStreamReader(
+                                        responseStream,
+                                        "UTF-8"
+                                )
+                        );
+
+                StringBuilder response =
+                        new StringBuilder();
+
+                String line;
+
+                while ((line = reader.readLine()) != null) {
+                    response.append(line);
+                }
+
+                reader.close();
+                connection.disconnect();
+
+                JSONObject json =
+                        new JSONObject(
+                                response.toString()
+                        );
+
+                if (!json.optBoolean("ok", false)) {
+                    throw new Exception(
+                            json.optString(
+                                    "error",
+                                    "File analysis failed"
+                            )
+                    );
+                }
+
+                String answer =
+                        json.optString(
+                                "answer",
+                                "File पढ़ी गई, लेकिन analysis नहीं मिला।"
+                        );
+
+                final String finalFileName =
+                        fileName;
+
+                final String finalAnswer =
+                        answer;
+
+                runOnUiThread(() -> {
+                    addMessage(
+                            "RAJ AI: 📁 "
+                                    + finalFileName
+                                    + "\n\n"
+                                    + finalAnswer
+                    );
+
+                    speakAnswer(finalAnswer);
+                    input.setEnabled(true);
+                });
+
+            } catch (Exception e) {
+                runOnUiThread(() -> {
+                    addMessage(
+                            "RAJ AI: File analysis error — "
+                                    + e.getMessage()
+                    );
+
+                    input.setEnabled(true);
+                });
+            }
+        }).start();
+    }
+
+    private void openFilePickerAction() {
+        try {
+            Intent intent = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+            intent.addCategory(Intent.CATEGORY_OPENABLE);
+            intent.setType("*/*");
+            startActivityForResult(intent, 1003);
+        } catch (Exception e) {
+            addMessage("RAJ AI: File picker नहीं खुल पाया।");
+        }
     }
 
     private void openCameraAction() {

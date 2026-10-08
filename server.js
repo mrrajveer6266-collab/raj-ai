@@ -6,7 +6,7 @@ require('dotenv').config();
 const http = require('http');
 const { runAction } = require('./core/action-runner');
 const { analyzeFile } = require('./tools/files/analyzer');
-const { askAI } = require('./core/ai');
+const { askAI, askAIWithImage } = require('./core/ai');
 
 const PORT = Number(process.env.PORT) || 8787;
 
@@ -40,6 +40,29 @@ function readBody(req, maxBytes = 10 * 1024 * 1024) {
 
     req.on('error', reject);
   });
+}
+
+
+function applyLanguageInstruction(message) {
+  const text = String(message || '');
+
+  const hindi =
+    /हिंदी\s*(में|मे)|hindi\s*(में|me|mein)|in\s+hindi|answer\s+in\s+hindi/i
+      .test(text);
+
+  const english =
+    /अंग्रेजी\s*(में|मे)|english\s*(में|मे|me|mein)|in\s+english|answer\s+in\s+english/i
+      .test(text);
+
+  if (hindi && !english) {
+    return text + "\n\nLANGUAGE OVERRIDE: इस request का पूरा उत्तर केवल हिंदी में दो। User की explicit language instruction को प्राथमिकता दो।";
+  }
+
+  if (english && !hindi) {
+    return text + "\n\nLANGUAGE OVERRIDE: Answer this request entirely in English. Follow the user's explicit language instruction as the highest priority.";
+  }
+
+  return text;
 }
 
 const server = http.createServer(async (req, res) => {
@@ -215,7 +238,87 @@ Give a useful direct answer.
       }
     }
 
-    if (req.method === 'POST' && req.url === '/chat') {
+  
+  if (req.method === 'POST' && req.url === '/analyze-image') {
+    try {
+      const payload = await readBody(req, 10 * 1024 * 1024);
+
+      const base64 = String(payload.data || '').trim();
+      const mimeType = String(
+        payload.mimeType || 'image/jpeg'
+      ).trim();
+      const question = String(
+        payload.question || 'इस image में क्या दिखाई दे रहा है?'
+      ).trim();
+
+      if (!base64) {
+        return sendJson(res, 400, {
+          ok: false,
+          error: 'Image data नहीं मिला।'
+        });
+      }
+
+      const allowedImages = [
+        'image/jpeg',
+        'image/png',
+        'image/webp',
+        'image/gif'
+      ];
+
+      if (!allowedImages.includes(mimeType)) {
+        return sendJson(res, 400, {
+          ok: false,
+          error: 'अभी JPG, PNG, WEBP और GIF images supported हैं।'
+        });
+      }
+
+      const buffer = Buffer.from(base64, 'base64');
+
+      if (!buffer.length) {
+        return sendJson(res, 400, {
+          ok: false,
+          error: 'Image खाली है।'
+        });
+      }
+
+      const MAX_IMAGE_SIZE = 6 * 1024 * 1024;
+
+      if (buffer.length > MAX_IMAGE_SIZE) {
+        return sendJson(res, 413, {
+          ok: false,
+          error: 'Image 6 MB से बड़ी है। अभी अधिकतम 6 MB supported है।'
+        });
+      }
+
+      const answer = await askAIWithImage(
+        base64,
+        mimeType,
+        question
+      );
+
+      return sendJson(res, 200, {
+        ok: true,
+        tool: 'image_analyze',
+        answer: typeof answer === 'string'
+          ? answer
+          : String(answer || ''),
+        data: {
+          mimeType,
+          size: buffer.length
+        }
+      });
+
+    } catch (error) {
+      console.error('Image analysis error:', error);
+
+      return sendJson(res, 500, {
+        ok: false,
+        error: error.message || 'Image analysis failed'
+      });
+    }
+  }
+
+  if (req.method === 'POST' && req.url === '/chat') {
     try {
       const body = await readBody(req);
       const message = String(body.message || '').trim();

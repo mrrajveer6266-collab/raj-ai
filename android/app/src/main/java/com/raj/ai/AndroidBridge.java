@@ -6,10 +6,18 @@ import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Build;
 import android.content.Intent;
+import android.content.ContentValues;
+import android.net.Uri;
+import android.os.Build;
+import android.os.Environment;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.Locale;
 
 public class AndroidBridge {
 
     private final Activity activity;
+    private Uri cameraOutputUri;
 
     public AndroidBridge(Activity activity) {
         this.activity = activity;
@@ -35,9 +43,66 @@ public class AndroidBridge {
         }
 
         Intent intent = new Intent(android.provider.MediaStore.ACTION_IMAGE_CAPTURE);
-        if (intent.resolveActivity(activity.getPackageManager()) != null) {
-            activity.startActivity(intent);
+
+        if (intent.resolveActivity(activity.getPackageManager()) == null) {
+            return;
         }
+
+        try {
+            String timestamp = new SimpleDateFormat(
+                "yyyyMMdd_HHmmss",
+                Locale.US
+            ).format(new Date());
+
+            ContentValues values = new ContentValues();
+            values.put(
+                android.provider.MediaStore.Images.Media.DISPLAY_NAME,
+                "RAJ_AI_" + timestamp + ".jpg"
+            );
+            values.put(
+                android.provider.MediaStore.Images.Media.MIME_TYPE,
+                "image/jpeg"
+            );
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                values.put(
+                    android.provider.MediaStore.Images.Media.RELATIVE_PATH,
+                    Environment.DIRECTORY_PICTURES + "/RAJ AI"
+                );
+            }
+
+            cameraOutputUri = activity.getContentResolver().insert(
+                android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
+                values
+            );
+
+            if (cameraOutputUri == null) {
+                return;
+            }
+
+            intent.putExtra(
+                android.provider.MediaStore.EXTRA_OUTPUT,
+                cameraOutputUri
+            );
+
+            intent.addFlags(
+                Intent.FLAG_GRANT_WRITE_URI_PERMISSION |
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            );
+
+            activity.startActivityForResult(intent, requestCode);
+
+        } catch (Exception e) {
+            cameraOutputUri = null;
+        }
+    }
+
+    public Uri getCameraOutputUri() {
+        return cameraOutputUri;
+    }
+
+    public void clearCameraOutputUri() {
+        cameraOutputUri = null;
     }
 
     public boolean hasNotificationPermission() {
