@@ -203,22 +203,86 @@ async function callGeminiImage(imageBase64, mimeType, message) {
     .trim();
 }
 
-async function askAIWithImage(imageBase64, mimeType, userMessage) {
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error('GEMINI_API_KEY उपलब्ध नहीं है।');
-  }
 
-  const answer = await callGeminiImage(
-    imageBase64,
-    mimeType,
-    userMessage
+async function callGroqImage(imageBase64, mimeType, message) {
+  const model = 'meta-llama/llama-4-scout-17b-16e-instruct';
+
+  const r = await fetch(
+    'https://api.groq.com/openai/v1/chat/completions',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          {
+            role: 'system',
+            content: SYSTEM_PROMPT
+          },
+          {
+            role: 'user',
+            content: [
+              {
+                type: 'text',
+                text: message
+              },
+              {
+                type: 'image_url',
+                image_url: {
+                  url: `data:${mimeType};base64,${imageBase64}`
+                }
+              }
+            ]
+          }
+        ],
+        temperature: 0.7
+      })
+    }
   );
 
-  if (!answer) {
-    throw new Error('Image का कोई जवाब नहीं मिला।');
+  const data = await r.json();
+
+  if (!r.ok) {
+    throw new Error(
+      data?.error?.message || `Groq image ${r.status}`
+    );
   }
 
-  return cleanAIResponse(answer);
+  return data.choices?.[0]?.message?.content?.trim();
+}
+
+async function askAIWithImage(imageBase64, mimeType, userMessage) {
+  if (!process.env.GEMINI_API_KEY && !process.env.GROQ_API_KEY) {
+    throw new Error('Image analysis के लिए कोई vision provider उपलब्ध नहीं है।');
+  }
+
+  const providers = [
+    ['Gemini', () => callGeminiImage(imageBase64, mimeType, userMessage)],
+    ['Groq', () => callGroqImage(imageBase64, mimeType, userMessage)]
+  ];
+
+  const errors = [];
+
+  for (const [name, fn] of providers) {
+    try {
+      const answer = await fn();
+
+      if (answer && String(answer).trim()) {
+        return cleanAIResponse(answer);
+      }
+
+      errors.push(`${name}: empty response`);
+    } catch (error) {
+      errors.push(`${name}: ${error.message}`);
+    }
+  }
+
+  throw new Error(
+    `Image providers unavailable. ${errors.join(' | ')}`
+  );
 }
 
 async function askAI(message) {
